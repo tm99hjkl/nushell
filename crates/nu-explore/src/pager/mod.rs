@@ -954,20 +954,33 @@ fn search_pattern(data: impl Iterator<Item = String>, pat: &str, rev: bool) -> V
 }
 
 fn cmd_input_key_event(buf: &mut CommandBuf, key: &KeyEvent) -> bool {
-    match &key.code {
-        KeyCode::Esc => {
+    match &key {
+        KeyEvent {
+            code: KeyCode::Esc, ..
+        } => {
             buf.is_cmd_input = false;
             buf.buf_cmd2 = String::new();
             true
         }
-        KeyCode::Enter => {
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
             buf.is_cmd_input = false;
             buf.run_cmd = true;
             buf.cmd_history.push(buf.buf_cmd2.clone());
             buf.cmd_history_pos = buf.cmd_history.len();
             true
         }
-        KeyCode::Backspace => {
+        KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('h'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        } => {
             if buf.buf_cmd2.is_empty() {
                 buf.is_cmd_input = false;
             } else {
@@ -977,12 +990,37 @@ fn cmd_input_key_event(buf: &mut CommandBuf, key: &KeyEvent) -> bool {
 
             true
         }
-        KeyCode::Char(c) => {
-            buf.buf_cmd2.push(*c);
-            buf.cmd_history_allow = false;
+        KeyEvent {
+            code: KeyCode::Char('u'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        } => {
+            buf.buf_cmd2 = String::new();
             true
         }
-        KeyCode::Down if buf.buf_cmd2.is_empty() || buf.cmd_history_allow => {
+        KeyEvent {
+            code: KeyCode::Char('w'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        } => {
+            buf.buf_cmd2.pop();
+            while !(buf.buf_cmd2.ends_with("/")
+                || buf.buf_cmd2.ends_with(" ")
+                || buf.buf_cmd2.is_empty())
+            {
+                buf.buf_cmd2.pop();
+            }
+            true
+        }
+        KeyEvent {
+            code: KeyCode::Down,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('n'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        } if buf.buf_cmd2.is_empty() || buf.cmd_history_allow => {
             if !buf.cmd_history.is_empty() {
                 buf.cmd_history_allow = true;
                 buf.cmd_history_pos = min(
@@ -994,7 +1032,14 @@ fn cmd_input_key_event(buf: &mut CommandBuf, key: &KeyEvent) -> bool {
 
             true
         }
-        KeyCode::Up if buf.buf_cmd2.is_empty() || buf.cmd_history_allow => {
+        KeyEvent {
+            code: KeyCode::Up, ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('p'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        } if buf.buf_cmd2.is_empty() || buf.cmd_history_allow => {
             if !buf.cmd_history.is_empty() {
                 buf.cmd_history_allow = true;
                 buf.cmd_history_pos = buf.cmd_history_pos.saturating_sub(1);
@@ -1003,8 +1048,67 @@ fn cmd_input_key_event(buf: &mut CommandBuf, key: &KeyEvent) -> bool {
 
             true
         }
+        KeyEvent {
+            code: KeyCode::Char(c),
+            ..
+        } => {
+            buf.buf_cmd2.push(*c);
+            buf.cmd_history_allow = false;
+            true
+        }
         _ => true,
     }
+    // match &key.code {
+    //     KeyCode::Esc => {
+    //         buf.is_cmd_input = false;
+    //         buf.buf_cmd2 = String::new();
+    //         true
+    //     }
+    //     KeyCode::Enter => {
+    //         buf.is_cmd_input = false;
+    //         buf.run_cmd = true;
+    //         buf.cmd_history.push(buf.buf_cmd2.clone());
+    //         buf.cmd_history_pos = buf.cmd_history.len();
+    //         true
+    //     }
+    //     KeyCode::Backspace | KeyCode::Backspace => {
+    //         if buf.buf_cmd2.is_empty() {
+    //             buf.is_cmd_input = false;
+    //         } else {
+    //             buf.buf_cmd2.pop();
+    //             buf.cmd_history_allow = false;
+    //         }
+
+    //         true
+    //     }
+    //     KeyCode::Char(c) => {
+    //         buf.buf_cmd2.push(*c);
+    //         buf.cmd_history_allow = false;
+    //         true
+    //     }
+    //     KeyCode::Down if buf.buf_cmd2.is_empty() || buf.cmd_history_allow => {
+    //         if !buf.cmd_history.is_empty() {
+    //             buf.cmd_history_allow = true;
+    //             buf.cmd_history_pos = min(
+    //                 buf.cmd_history_pos + 1,
+    //                 buf.cmd_history.len().saturating_sub(1),
+    //             );
+    //             buf.buf_cmd2 = buf.cmd_history[buf.cmd_history_pos].clone();
+    //         }
+
+    //         true
+    //     }
+    //     KeyCode::Up if buf.buf_cmd2.is_empty() || buf.cmd_history_allow => {
+    //         if !buf.cmd_history.is_empty() {
+    //             buf.cmd_history_allow = true;
+    //             buf.cmd_history_pos = buf.cmd_history_pos.saturating_sub(1);
+    //             buf.buf_cmd2 = buf.cmd_history[buf.cmd_history_pos].clone();
+    //         }
+
+    //         true
+    //     }
+    //     _ => true,
+    // }
 }
 
 fn value_as_style(style: &mut nu_ansi_term::Style, value: &Value) -> bool {
